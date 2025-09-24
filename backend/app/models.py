@@ -2,6 +2,7 @@ from django.contrib.auth.models import AbstractBaseUser, BaseUserManager, Permis
 from django.db import models
 from django.utils import timezone
 
+
 class EmployeeUserManager(BaseUserManager):
     def create_user(self, employee_id, role="employee", password=None, first_name="", last_name="", **extra_fields):
         if not employee_id:
@@ -9,7 +10,7 @@ class EmployeeUserManager(BaseUserManager):
         if not role:
             raise ValueError("Role is required")
 
-        role = role.lower()  # normalize role input
+        role = role.lower()
 
         if role not in ["employee", "hr", "manager", "admin"]:
             raise ValueError("Invalid role")
@@ -59,13 +60,37 @@ class EmployeeUser(AbstractBaseUser, PermissionsMixin):
     role = models.CharField(max_length=20, choices=ROLE_CHOICES, default="employee")
     first_name = models.CharField(max_length=50, blank=True, null=True)
     last_name = models.CharField(max_length=50, blank=True, null=True)
+
+    # 🔹 New fields
+    email = models.EmailField(unique=True, null=True, blank=True)
+    phone = models.CharField(max_length=15, null=True, blank=True)
+    aadhar = models.CharField(max_length=12, unique=True, null=True, blank=True)
+    uan = models.CharField(max_length=20, unique=True, null=True, blank=True)
+
+    bank_account = models.CharField(max_length=20, null=True, blank=True)
+    ifsc = models.CharField(max_length=11, null=True, blank=True)
+    bank_name = models.CharField(max_length=100, null=True, blank=True)
+
+    profile_photo = models.ImageField(upload_to="profile_photos/", null=True, blank=True)
+    gender = models.CharField(max_length=10, choices=[("male", "Male"), ("female", "Female"), ("other", "Other")], null=True, blank=True)
+    nationality = models.CharField(max_length=50, null=True, blank=True)
+    address = models.TextField(null=True, blank=True)
+    dob = models.DateField(null=True, blank=True)
+
+    work_location = models.CharField(max_length=100, null=True, blank=True)
+    reporting_manager = models.ForeignKey(
+        "self", null=True, blank=True, on_delete=models.SET_NULL, related_name="team_members"
+    )
+    department = models.CharField(max_length=100, null=True, blank=True)
+
+    # System flags
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=True)
 
     objects = EmployeeUserManager()
 
     USERNAME_FIELD = "employee_id"
-    REQUIRED_FIELDS = ["role", "first_name", "last_name"]
+    REQUIRED_FIELDS = ["role", "first_name", "last_name", "email"]
 
     def clean(self):
         if self.role:
@@ -79,6 +104,7 @@ class EmployeeUser(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return f"{self.employee_id} ({self.role})"
+
 
 from .models import EmployeeUser
 

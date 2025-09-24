@@ -48,14 +48,41 @@ class RegisterEmployeeSerializer(serializers.ModelSerializer):
         return user
 
 
-# ---------------- Update Employee ----------------
+from rest_framework import serializers
+from .models import EmployeeUser
+
+
+# ---------------- Update Employee (Admin/HR use) ----------------
 class UpdateEmployeeSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
     role = serializers.CharField(required=False)
 
     class Meta:
         model = EmployeeUser
-        fields = ["first_name", "last_name", "password", "role"]
+        fields = [
+            "first_name",
+            "last_name",
+            "email",
+            "phone",
+            "aadhar",
+            "uan",
+            "dob",
+            "gender",
+            "nationality",
+            "address",
+            "work_location",
+            "department",
+            "reporting_manager",
+            "bank_account",
+            "ifsc",
+            "bank_name",
+            "profile_photo",
+            "password",
+            "role",
+        ]
+        extra_kwargs = {
+            "password": {"write_only": True, "required": False},
+        }
 
     def validate_role(self, value):
         role = value.lower()
@@ -73,6 +100,8 @@ class UpdateEmployeeSerializer(serializers.ModelSerializer):
             instance.role = role.lower()
             if role.lower() in ["admin", "hr", "manager"]:
                 instance.is_staff = True
+            else:
+                instance.is_staff = False
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -80,18 +109,35 @@ class UpdateEmployeeSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
+
+# ---------------- Profile Update (Employee self-service) ----------------
 class ProfileUpdateSerializer(serializers.ModelSerializer):
     class Meta:
         model = EmployeeUser
-        fields = ["first_name", "last_name", "password"]
-        extra_kwargs = {"password": {"write_only": True, "required": False}}
+        fields = [
+            "first_name",
+            "last_name",
+            "email",
+            "phone",
+            "dob",
+            "gender",
+            "nationality",
+            "address",
+            "profile_photo",
+            "password",
+        ]
+        extra_kwargs = {
+            "password": {"write_only": True, "required": False},
+        }
 
     def update(self, instance, validated_data):
         password = validated_data.pop("password", None)
         if password:
             instance.set_password(password)
+
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
+
         instance.save()
         return instance
 
