@@ -41,14 +41,22 @@ export default function Login() {
   };
 
   return (
-    <SafeAreaView className="flex-1 justify-center items-center bg-gradient-to-br from-blue-50 to-blue-100 px-6">
-      <Text className="text-3xl font-bold text-blue-600 mb-8">Welcome Back!</Text>
+    <SafeAreaView className="flex-1 justify-center items-center bg-gradient-to-br from-blue-100 via-blue-50 to-white px-6">
+      
+      {/* <Text className="text-4xl font-extrabold text-blue-700 mb-10 tracking-wide">
+      HELLO👋
+      </Text> */}
+<Text className="text-lg font-light text-gray-700 mb-6 tracking-tight">
 
+  ✨Let’s get you back on track 🚀
+</Text>
+
+   
       <TextInput
         placeholder="Employee ID"
         value={employeeId}
         onChangeText={setEmployeeId}
-        className="w-full bg-white px-4 py-3 rounded-lg shadow mb-4 text-gray-700"
+        className="w-72 bg-white px-4 py-3 rounded-2xl shadow-md border border-gray-200 mb-4 text-gray-700 focus:border-blue-400"
       />
 
       <TextInput
@@ -56,18 +64,21 @@ export default function Login() {
         value={password}
         onChangeText={setPassword}
         secureTextEntry
-        className="w-full bg-white px-4 py-3 rounded-lg shadow mb-6 text-gray-700"
+        className="w-72 bg-white px-4 py-3 rounded-2xl shadow-md border border-gray-200 mb-6 text-gray-700 focus:border-blue-400"
       />
 
-      <TouchableOpacity
-        onPress={handleLogin}
-        className="w-full bg-blue-600 py-3 rounded-lg shadow"
-        disabled={loading}
-      >
-        <Text className="text-center text-white font-bold text-lg">
-          {loading ? "Logging in..." : "Login"}
-        </Text>
-      </TouchableOpacity>
+     
+    <TouchableOpacity
+  onPress={handleLogin}
+  className="w-40 bg-blue-600 py-3 rounded-xl shadow-lg active:bg-blue-700 active:scale-95 transition-transform duration-150 self-center"
+  disabled={loading}
+>
+  <Text className="text-center text-white font-bold text-base tracking-wide">
+    {loading ? "Logging in..." : "Login"}
+  </Text>
+</TouchableOpacity>
+
+
     </SafeAreaView>
   );
 }
