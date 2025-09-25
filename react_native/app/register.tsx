@@ -89,12 +89,7 @@ export default function Register() {
           </Text>
         </TouchableOpacity>
 
-        <View className="flex-row justify-center mt-2">
-          <Text className="text-gray-600">Already have an account? </Text>
-          <TouchableOpacity onPress={() => router.replace("/")}>
-            <Text className="text-blue-600 font-semibold">Login</Text>
-          </TouchableOpacity>
-        </View>
+       
       </ScrollView>
     </SafeAreaView>
   );

@@ -1,5 +1,12 @@
 import { useState } from "react";
-import { Text, TextInput, TouchableOpacity, Alert, View, Platform } from "react-native";
+import {
+  Text,
+  TextInput,
+  TouchableOpacity,
+  Alert,
+  View,
+  Platform,
+} from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -11,6 +18,9 @@ export default function Login() {
   const [employeeId, setEmployeeId] = useState("");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
+
+  // Track focus state
+  const [focusedInput, setFocusedInput] = useState<"employeeId" | "password" | null>(null);
 
   const handleLogin = async () => {
     if (!employeeId || !password) {
@@ -42,27 +52,52 @@ export default function Login() {
       <View
         className="w-full"
         style={{
-          maxWidth: Platform.OS === "web" ? 400 : "100%", // max width on web
+          maxWidth: Platform.OS === "web" ? 400 : "100%", // ✅ mobile full width, web max 400px
           width: "100%",
         }}
       >
-        <Text className="text-2xl font-bold text-[#007bff] mb-6 text-center">Welcome Back!</Text>
+        <Text className="text-2xl font-bold text-[#007bff] mb-6 text-center">
+          Welcome Back!
+        </Text>
 
-        <TextInput
-          placeholder="Employee ID"
-          value={employeeId}
-          onChangeText={setEmployeeId}
-          className="w-full bg-white px-3 py-2 rounded-lg shadow mb-3 text-gray-700"
-        />
+        {/* Employee ID Input */}
+        <View
+          className={`w-full px-3 py-2 rounded-lg shadow mb-3 ${
+            focusedInput === "employeeId"
+              ? "border-2 border-blue-500"
+              : "border border-gray-300"
+          } bg-white`}
+        >
+          <TextInput
+            placeholder="Employee ID"
+            value={employeeId}
+            onChangeText={setEmployeeId}
+            className="text-gray-700"
+            onFocus={() => setFocusedInput("employeeId")}
+            onBlur={() => setFocusedInput(null)}
+          />
+        </View>
 
-        <TextInput
-          placeholder="Password"
-          value={password}
-          onChangeText={setPassword}
-          secureTextEntry
-          className="w-full bg-white px-3 py-2 rounded-lg shadow mb-4 text-gray-700"
-        />
+        {/* Password Input */}
+        <View
+          className={`w-full px-3 py-2 rounded-lg shadow mb-4 ${
+            focusedInput === "password"
+              ? "border-2 border-blue-500"
+              : "border border-gray-300"
+          } bg-white`}
+        >
+          <TextInput
+            placeholder="Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+            className="text-gray-700"
+            onFocus={() => setFocusedInput("password")}
+            onBlur={() => setFocusedInput(null)}
+          />
+        </View>
 
+        {/* Login button */}
         <TouchableOpacity
           onPress={handleLogin}
           className="w-full bg-[#007bff] py-3 rounded-lg shadow mb-4"
@@ -72,13 +107,6 @@ export default function Login() {
             {loading ? "Logging in..." : "Login"}
           </Text>
         </TouchableOpacity>
-
-        <View className="flex-row justify-center mt-2">
-          <Text className="text-gray-600">Don’t have an account? </Text>
-          <TouchableOpacity onPress={() => router.push("/register")}>
-            <Text className="text-[#007bff] font-semibold">Register</Text>
-          </TouchableOpacity>
-        </View>
       </View>
     </SafeAreaView>
   );
