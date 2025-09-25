@@ -59,31 +59,6 @@ def list_employees(request):
     return Response(list(employees), status=status.HTTP_200_OK)
 
 # ---------------- Update ----------------
-@api_view(['PUT', 'PATCH'])
-@permission_classes([IsAuthenticated])
-def update_employee(request, employee_id):
-    if request.user.role not in ["admin", "hr", "manager"]:
-        return Response({"error": "Only admin/hr/manager can edit users"}, status=status.HTTP_403_FORBIDDEN)
-
-    try:
-        employee = EmployeeUser.objects.get(employee_id=employee_id, role__in=["employee", "hr", "manager"])
-    except EmployeeUser.DoesNotExist:
-        return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
-
-    employee.first_name = request.data.get("first_name", employee.first_name)
-    employee.last_name = request.data.get("last_name", employee.last_name)
-
-    role = request.data.get("role", employee.role).lower()
-    if role in ["employee", "hr", "manager"]:
-        employee.role = role
-        if role in ["hr", "manager"]:
-            employee.is_staff = True
-
-    if "password" in request.data and request.data["password"]:
-        employee.set_password(request.data["password"])
-
-    employee.save()
-    return Response({"message": f"{employee.role.capitalize()} updated successfully"}, status=status.HTTP_200_OK)
 
 # ---------------- Delete ----------------
 @api_view(['DELETE'])
@@ -101,15 +76,47 @@ def delete_employee(request, employee_id):
     employee.delete()
     return Response({"message": f"{role.capitalize()} deleted successfully"}, status=status.HTTP_200_OK)
 
-@api_view(['PUT'])
+# ---------------- Update Employee (Admin/HR/Manager) ----------------
+@api_view(['PUT', 'PATCH'])
+@permission_classes([IsAuthenticated])
+def update_employee(request, employee_id):
+    # Only admin/hr/manager can update
+    if request.user.role not in ["admin", "hr", "manager"]:
+        return Response(
+            {"error": "Only admin/hr/manager can edit users"},
+            status=status.HTTP_403_FORBIDDEN
+        )
+
+    try:
+        employee = EmployeeUser.objects.get(
+            employee_id=employee_id,
+            role__in=["employee", "hr", "manager"]
+        )
+    except EmployeeUser.DoesNotExist:
+        return Response(
+            {"error": "User not found"},
+            status=status.HTTP_404_NOT_FOUND
+        )
+
+    serializer = UpdateEmployeeSerializer(employee, data=request.data, partial=True)
+    if serializer.is_valid():
+        serializer.save()
+        return Response(
+            {"message": f"{employee.role.capitalize()} updated successfully"},
+            status=status.HTTP_200_OK
+        )
+    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+# ---------------- Update Profile (Self-service) ----------------
+@api_view(['PUT', 'PATCH'])
 @permission_classes([IsAuthenticated])
 def update_profile(request):
     serializer = ProfileUpdateSerializer(instance=request.user, data=request.data, partial=True)
     if serializer.is_valid():
         serializer.save()
-        return Response({"message": "Profile updated successfully"})
+        return Response({"message": "Profile updated successfully"}, status=status.HTTP_200_OK)
     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
 # ----------------- Clock / Break / Lunch -----------------
 def get_or_create_today_attendance(user):
     attendance, created = Attendance.objects.get_or_create(user=user, date=timezone.localdate())

@@ -1,6 +1,7 @@
 from django.urls import path
 from . import views   
 
+
 urlpatterns = [
     path("api/login/", views.LoginAPIView.as_view(), name="login"),
     path("api/register-employee/", views.register_employee, name="register-employee"),
@@ -8,6 +9,7 @@ urlpatterns = [
     path("api/employees/<str:employee_id>/update/", views.update_employee, name="update-employee"),
     path("api/employees/<str:employee_id>/delete/", views.delete_employee, name="delete-employee"),
     path("api/attendance-summary/", views.attendance_summary_api, name="attendance-summary-api"),
+    path("api/update_employee/<str:employee_id>/", views.update_employee, name="update-employee"),
     path("api/update_profile/", views.update_profile, name="update_profile"),
     path("api/clock_in/", views.clock_in, name="clock_in"),
     path("api/clock_out/", views.clock_out, name="clock_out"),
