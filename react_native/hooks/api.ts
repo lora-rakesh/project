@@ -3,11 +3,54 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 
 const API_URL = "http://127.0.0.1:8000/api";
 
+// Helper to get token from AsyncStorage
+const getToken = async () => {
+  const tokenString = await AsyncStorage.getItem("userToken");
+  const tokenData = tokenString ? JSON.parse(tokenString) : null;
+  return tokenData?.access || null;
+}
+
 export const loginUser = async (employeeId: string, password: string) => {
   return axios.post(`${API_URL}/login/`, {
     employee_id: employeeId,
     password: password,
   });
+};
+
+// Clock functions
+export const clockIn = async (employeeId: any) => {
+  const token = await getToken();
+  return axios.post(`${API_URL}/clock_in/`, {}, { headers: { Authorization: `Bearer ${token}` } });
+};
+export const clockOut = async () => {
+  const token = await getToken();
+  return axios.post(`${API_URL}/clock_out/`, {}, { headers: { Authorization: `Bearer ${token}` } });
+};
+
+// Lunch functions
+export const lunchIn = async () => {
+  const token = await getToken();
+  return axios.post(`${API_URL}/lunch_in/`, {}, { headers: { Authorization: `Bearer ${token}` } });
+};
+export const lunchOut = async () => {
+  const token = await getToken();
+  return axios.post(`${API_URL}/lunch_out/`, {}, { headers: { Authorization: `Bearer ${token}` } });
+};
+
+// Break functions
+export const breakIn = async () => {
+  const token = await getToken();
+  return axios.post(`${API_URL}/break_in/`, {}, { headers: { Authorization: `Bearer ${token}` } });
+};
+export const breakOut = async () => {
+  const token = await getToken();
+  return axios.post(`${API_URL}/break_out/`, {}, { headers: { Authorization: `Bearer ${token}` } });
+};
+
+// Update profile
+export const updateProfile = async (data: any) => {
+  const token = await getToken();
+  return axios.put(`${API_URL}/update_profile/`, data, { headers: { Authorization: `Bearer ${token}` } });
 };
 
 export const registerEmployee = async (userData: any) => {
@@ -16,49 +59,6 @@ export const registerEmployee = async (userData: any) => {
 
   return axios.post(`${API_URL}/register-employee/`, userData, {
     headers: parsed ? { Authorization: `Bearer ${parsed.access}` } : {},
-  });
-};
-export const clockIn = async (token: string) => {
-  return axios.post(
-    `${API_URL}/api/clock_in/`,
-    {},
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-};
-
-// Clock out
-export const clockOut = async (token: string) => {
-  return axios.post(
-    `${API_URL}/api/clock_out/`,
-    {},
-    { headers: { Authorization: `Bearer ${token}` } }
-  );
-};
-
-// Lunch in
-export const lunchIn = async (token: string) => {
-  return axios.post(`${API_URL}/api/lunch_in/`, {}, { headers: { Authorization: `Bearer ${token}` } });
-};
-
-// Lunch out
-export const lunchOut = async (token: string) => {
-  return axios.post(`${API_URL}/api/lunch_out/`, {}, { headers: { Authorization: `Bearer ${token}` } });
-};
-
-// Break in
-export const breakIn = async (token: string) => {
-  return axios.post(`${API_URL}/api/break_in/`, {}, { headers: { Authorization: `Bearer ${token}` } });
-};
-
-// Break out
-export const breakOut = async (token: string) => {
-  return axios.post(`${API_URL}/api/break_out/`, {}, { headers: { Authorization: `Bearer ${token}` } });
-};
-
-// Update profile
-export const updateProfile = async (token: string, data: any) => {
-  return axios.put(`${API_URL}/api/update_profile/`, data, {
-    headers: { Authorization: `Bearer ${token}` },
   });
 };
 
