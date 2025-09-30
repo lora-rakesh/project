@@ -1,6 +1,7 @@
 from rest_framework import serializers
 from django.contrib.auth import authenticate
-from .models import EmployeeUser, Attendance
+from .models import EmployeeUser, Attendance, MusterRequest
+
 
 # ---------------- Login ----------------
 class LoginSerializer(serializers.Serializer):
@@ -48,11 +49,7 @@ class RegisterEmployeeSerializer(serializers.ModelSerializer):
         return user
 
 
-from rest_framework import serializers
-from .models import EmployeeUser
-
-
-# ---------------- Update Employee (Admin/HR use) ----------------
+# ---------------- Update Employee (Admin/HR/Manager use) ----------------
 class UpdateEmployeeSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, required=False)
     role = serializers.CharField(required=False)
@@ -98,10 +95,7 @@ class UpdateEmployeeSerializer(serializers.ModelSerializer):
         role = validated_data.pop("role", None)
         if role:
             instance.role = role.lower()
-            if role.lower() in ["admin", "hr", "manager"]:
-                instance.is_staff = True
-            else:
-                instance.is_staff = False
+            instance.is_staff = role.lower() in ["admin", "hr", "manager"]
 
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
@@ -141,30 +135,48 @@ class ProfileUpdateSerializer(serializers.ModelSerializer):
         instance.save()
         return instance
 
+
+# ---------------- Attendance ----------------
 class AttendanceSerializer(serializers.ModelSerializer):
     class Meta:
         model = Attendance
         fields = "__all__"
 
+
 class AttendanceEmployeeSerializer(serializers.ModelSerializer):
-    employee_id = serializers.CharField(source='user.employee_id')
-    first_name = serializers.CharField(source='user.first_name')
-    last_name = serializers.CharField(source='user.last_name')
+    employee_id = serializers.CharField(source="user.employee_id")
+    first_name = serializers.CharField(source="user.first_name")
+    last_name = serializers.CharField(source="user.last_name")
 
     class Meta:
         model = Attendance
-        fields = ['employee_id', 'first_name', 'last_name', 'clock_in', 'clock_out', 'break_in', 'break_out', 'lunch_in', 'lunch_out']
+        fields = [
+            "employee_id",
+            "first_name",
+            "last_name",
+            "clock_in",
+            "clock_out",
+            "break_in",
+            "break_out",
+            "lunch_in",
+            "lunch_out",
+        ]
 
-from rest_framework import serializers
-from .models import MusterRequest
 
+# ---------------- Muster Requests ----------------
 class MusterRequestSerializer(serializers.ModelSerializer):
     employee_id = serializers.CharField(source="employee.employee_id", read_only=True)
 
     class Meta:
         model = MusterRequest
         fields = [
-            "id", "employee_id", "action", "requested_time", "reason", 
-            "status", "created_at", "updated_at"
+            "id",
+            "employee_id",
+            "action",
+            "requested_time",
+            "reason",
+            "status",
+            "created_at",
+            "updated_at",
         ]
         read_only_fields = ["status", "created_at", "updated_at"]
