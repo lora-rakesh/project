@@ -2,19 +2,23 @@ import React from "react";
 import { createDrawerNavigator } from "@react-navigation/drawer";
 import Dashboard from "./Dashboard";
 import Employee from "./Employee";
-import MusterStack from "./MusterStack"; // ✅ stack
 import Profile from "./Profile";
-import Muster from "./Muster";
+import MusterMain from "./Muster/MUsterMain"; // Import the opener
 
 const Drawer = createDrawerNavigator();
 
 export default function DashboardWrapper() {
   return (
-    <Drawer.Navigator screenOptions={{ headerShown: false }}>
+    <Drawer.Navigator 
+      screenOptions={{ 
+        headerShown: false,
+        drawerPosition: "left"
+      }}
+    >
       <Drawer.Screen name="Dashboard" component={Dashboard} />
       <Drawer.Screen name="Employee" component={Employee} />
-      {/* <Drawer.Screen name="Muster" component={Muster} /> ✅ stack instead of drawer */}
-      <Drawer.Screen name="Muster" component={Muster}/>
+      <Drawer.Screen name="Muster" component={MusterMain} />
+      <Drawer.Screen name="Profile" component={Profile} />
     </Drawer.Navigator>
   );
 }

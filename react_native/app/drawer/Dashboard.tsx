@@ -93,16 +93,23 @@ export default function Dashboard({ collapsed = false, navigation }: DashboardPr
     { title: "Lunch", buttons: [{ label: "Lunch In", api: lunchIn }, { label: "Lunch Out", api: lunchOut }] },
     { title: "Break", buttons: [{ label: "Break In", api: breakIn }, { label: "Break Out", api: breakOut }] },
   ];
-
-  const handlePress = async (apiFunc: Function, label: string, id: string) => {
-    try {
-      await apiFunc();
-      setFeedback((prev) => ({ ...prev, [id]: `${label} successful!` }));
-    } catch {
-      setFeedback((prev) => ({ ...prev, [id]: `${label} failed` }));
-    }
-    setTimeout(() => setFeedback((prev) => ({ ...prev, [id]: "" })), 2000);
-  };
+// In your Dashboard.tsx - update the handlePress function
+const handlePress = async (apiFunc: Function, label: string, id: string) => {
+  try {
+    console.log(`Attempting ${label}...`);
+    const result = await apiFunc();
+    console.log(`${label} Success:`, result);
+    setFeedback((prev) => ({ ...prev, [id]: `${label} successful!` }));
+    
+    // Refresh attendance data after successful action
+    // You can add this later when you implement real-time updates
+  } catch (error: any) {
+    console.log(`${label} Error:`, error);
+    const errorMessage = error.response?.data?.message || error.message || `${label} failed`;
+    setFeedback((prev) => ({ ...prev, [id]: errorMessage }));
+  }
+  setTimeout(() => setFeedback((prev) => ({ ...prev, [id]: "" })), 3000);
+};
 
   const handlePickImage = async () => {
     const result = await ImagePicker.launchImageLibraryAsync({
