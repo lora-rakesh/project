@@ -1,249 +1,194 @@
+from django.contrib.auth import login
+from django.shortcuts import get_object_or_404
 from django.utils import timezone
-from datetime import date
-from rest_framework import status
-from rest_framework.views import APIView
-from rest_framework.response import Response
-from rest_framework.decorators import api_view, permission_classes
+
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
 from rest_framework.permissions import IsAuthenticated
-from rest_framework_simplejwt.tokens import RefreshToken
+from rest_framework.response import Response
 
-from .models import EmployeeUser, Attendance, MusterRequest
+from rest_framework_simplejwt.views import TokenObtainPairView
+from rest_framework_simplejwt.serializers import TokenObtainPairSerializer
+
+from .models import Employee, Attendance, MusterRequest
 from .serializers import (
-    LoginSerializer,
-    RegisterEmployeeSerializer,
-    UpdateEmployeeSerializer,
-    ProfileUpdateSerializer,
-    AttendanceEmployeeSerializer,
+    EmployeeCreateSerializer,
+    EmployeeSerializer,
+    EmployeeSelfUpdateSerializer,
+    AttendanceSerializer,
     MusterRequestSerializer,
+    MusterRequestUpdateSerializer,
 )
+from .permissions import IsHRAdminManager, IsSelfOrHRAdminManager, IsOwnerOrHRAdminManager
 
 
-# ------------------ Helper ------------------
-def get_tokens_for_user(user):
-    """Return refresh + access JWT tokens for a user"""
-    refresh = RefreshToken.for_user(user)
-    return {
-        "refresh": str(refresh),
-        "access": str(refresh.access_token),
-    }
+# ======================== Custom JWT Login View ========================
+class MyTokenObtainPairSerializer(TokenObtainPairSerializer):
+    def validate(self, attrs):
+        data = super().validate(attrs)
+        data.update({
+            "user_id": self.user.id,
+            "employee_id": getattr(self.user, "employee_id", None),
+            "role": getattr(self.user, "role", None)
+        })
+        return data
 
 
-# ------------------ LOGIN ------------------
-class LoginAPIView(APIView):
-    authentication_classes = []  # open
-    permission_classes = []      # open
+class MyTokenObtainPairView(TokenObtainPairView):
+    serializer_class = MyTokenObtainPairSerializer
 
-    def post(self, request):
-        serializer = LoginSerializer(data=request.data)
-        if serializer.is_valid():
-            user = serializer.validated_data["user"]
-            tokens = get_tokens_for_user(user)
-            return Response({
-                "message": "Login successful",
-                "employee_id": user.employee_id,
-                "role": user.role,
-                "first_name": user.first_name,
-                "last_name": user.last_name,
-                "is_admin": user.is_staff or user.is_superuser,
-                "tokens": tokens,
-            }, status=status.HTTP_200_OK)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def post(self, request, *args, **kwargs):
+        response = super().post(request, *args, **kwargs)
+        if response.status_code == 200:
+            login(request, self.user)  # ✅ Session login for API dashboard
+        return response
 
 
-# ------------------ Register Employee ------------------
-@api_view(['POST'])
-def register_employee(request):
-    serializer = RegisterEmployeeSerializer(data=request.data)
-    if serializer.is_valid():
-        user = serializer.save()
-        tokens = get_tokens_for_user(user)
-        return Response({
-            "message": f"{user.role.capitalize()} registered successfully",
-            "employee_id": user.employee_id,
-            "role": user.role,
-            "tokens": tokens,
-        }, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+# ======================== Employee API ========================
+class EmployeeViewSet(viewsets.ModelViewSet):
+    queryset = Employee.objects.all()
+    lookup_field = "employee_id"
+
+    def get_serializer_class(self):
+        if self.action == "create":
+            return EmployeeCreateSerializer
+        if self.action in ("partial_update", "update") and self.request.user.employee_id == self.kwargs.get("employee_id"):
+            return EmployeeSelfUpdateSerializer
+        return EmployeeSerializer
+
+    def get_permissions(self):
+        if self.action in ("create", "list", "destroy"):
+            permission_classes = [IsAuthenticated, IsHRAdminManager]
+        elif self.action in ("update", "partial_update"):
+            permission_classes = [IsAuthenticated, IsSelfOrHRAdminManager]
+        elif self.action in ("retrieve",):
+            permission_classes = [IsAuthenticated]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [p() for p in permission_classes]
 
 
-# ------------------ Employee CRUD ------------------
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def list_employees(request):
-    if request.user.role not in ["admin", "hr", "manager"]:
-        return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+# ======================== Attendance API ========================
+class AttendanceViewSet(viewsets.GenericViewSet):
+    queryset = Attendance.objects.all()
+    serializer_class = AttendanceSerializer
+    lookup_field = "id"
+    permission_classes = [IsAuthenticated]
 
-    employees = EmployeeUser.objects.filter(role__in=["employee", "hr", "manager"]).values(
-        "id", "employee_id", "first_name", "last_name", "role", "is_staff"
-    )
-    return Response(list(employees), status=status.HTTP_200_OK)
+    def list(self, request):
+        employee_id = request.query_params.get("employee_id")
+        qs = self.queryset
+        if employee_id:
+            qs = qs.filter(employee__employee_id=employee_id)
+        else:
+            qs = qs.filter(employee=request.user)
 
+        page = self.paginate_queryset(qs)
+        if page is not None:
+            serializer = self.get_serializer(page, many=True)
+            return self.get_paginated_response(serializer.data)
 
-@api_view(['PUT', 'PATCH'])
-@permission_classes([IsAuthenticated])
-def update_employee(request, employee_id):
-    if request.user.role not in ["admin", "hr", "manager"]:
-        return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+        serializer = self.get_serializer(qs, many=True)
+        return Response(serializer.data)
 
-    try:
-        employee = EmployeeUser.objects.get(employee_id=employee_id)
-    except EmployeeUser.DoesNotExist:
-        return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+    def get_or_create_today(self, employee):
+        today = timezone.localdate()
+        obj, created = Attendance.objects.get_or_create(employee=employee, date=today)
+        return obj
 
-    serializer = UpdateEmployeeSerializer(employee, data=request.data, partial=True)
-    if serializer.is_valid():
-        serializer.save()
-        return Response({"message": f"{employee.role.capitalize()} updated successfully"})
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def _get_target_employee(self, request):
+        employee_id = request.data.get("employee_id")
+        if employee_id and request.user.role in ("hr", "admin", "manager", "superadmin"):
+            return get_object_or_404(Employee, employee_id=employee_id)
+        return request.user
 
+    @action(detail=False, methods=["post"])
+    def clock_in(self, request):
+        target_emp = self._get_target_employee(request)
+        att = self.get_or_create_today(target_emp)
+        if att.clock_in:
+            return Response({"detail": "Already clocked in."}, status=status.HTTP_400_BAD_REQUEST)
+        att.clock_in = timezone.now()
+        att.save()
+        return Response(self.get_serializer(att).data)
 
-@api_view(['DELETE'])
-@permission_classes([IsAuthenticated])
-def delete_employee(request, employee_id):
-    if request.user.role not in ["admin", "hr", "manager"]:
-        return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
+    @action(detail=False, methods=["post"])
+    def lunch_in(self, request):
+        target_emp = self._get_target_employee(request)
+        att = self.get_or_create_today(target_emp)
+        if att.lunch_in:
+            return Response({"detail": "Already lunch-in recorded."}, status=status.HTTP_400_BAD_REQUEST)
+        att.lunch_in = timezone.now()
+        att.save()
+        return Response(self.get_serializer(att).data)
 
-    try:
-        employee = EmployeeUser.objects.get(employee_id=employee_id)
-    except EmployeeUser.DoesNotExist:
-        return Response({"error": "User not found"}, status=status.HTTP_404_NOT_FOUND)
+    @action(detail=False, methods=["post"])
+    def lunch_out(self, request):
+        target_emp = self._get_target_employee(request)
+        att = self.get_or_create_today(target_emp)
+        if att.lunch_out:
+            return Response({"detail": "Already lunch-out recorded."}, status=status.HTTP_400_BAD_REQUEST)
+        att.lunch_out = timezone.now()
+        att.save()
+        return Response(self.get_serializer(att).data)
 
-    employee.delete()
-    return Response({"message": "Employee deleted successfully"})
+    @action(detail=False, methods=["post"])
+    def break_in(self, request):
+        target_emp = self._get_target_employee(request)
+        att = self.get_or_create_today(target_emp)
+        if att.break_in:
+            return Response({"detail": "Already break-in recorded."}, status=status.HTTP_400_BAD_REQUEST)
+        att.break_in = timezone.now()
+        att.save()
+        return Response(self.get_serializer(att).data)
 
+    @action(detail=False, methods=["post"])
+    def break_out(self, request):
+        target_emp = self._get_target_employee(request)
+        att = self.get_or_create_today(target_emp)
+        if att.break_out:
+            return Response({"detail": "Already break-out recorded."}, status=status.HTTP_400_BAD_REQUEST)
+        att.break_out = timezone.now()
+        att.save()
+        return Response(self.get_serializer(att).data)
 
-@api_view(['PUT', 'PATCH'])
-@permission_classes([IsAuthenticated])
-def update_profile(request):
-    serializer = ProfileUpdateSerializer(instance=request.user, data=request.data, partial=True)
-    if serializer.is_valid():
-        serializer.save()
-        return Response({"message": "Profile updated successfully"})
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-# ------------------ Attendance APIs ------------------
-def get_or_create_today_attendance(user):
-    attendance, _ = Attendance.objects.get_or_create(user=user, date=timezone.localdate())
-    return attendance
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def clock_in(request):
-    attendance = get_or_create_today_attendance(request.user)
-    attendance.clock_in = timezone.now()
-    attendance.save()
-    return Response({"message": "Clocked in", "time": attendance.clock_in})
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def clock_out(request):
-    attendance = get_or_create_today_attendance(request.user)
-    attendance.clock_out = timezone.now()
-    attendance.save()
-    return Response({"message": "Clocked out", "time": attendance.clock_out})
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def break_in(request):
-    attendance = get_or_create_today_attendance(request.user)
-    attendance.break_in = timezone.now()
-    attendance.save()
-    return Response({"message": "Break started", "time": attendance.break_in})
-
-
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def break_out(request):
-    attendance = get_or_create_today_attendance(request.user)
-    attendance.break_out = timezone.now()
-    attendance.save()
-    return Response({"message": "Break ended", "time": attendance.break_out})
+    @action(detail=False, methods=["post"])
+    def clock_out(self, request):
+        target_emp = self._get_target_employee(request)
+        att = self.get_or_create_today(target_emp)
+        if att.clock_out:
+            return Response({"detail": "Already clocked out."}, status=status.HTTP_400_BAD_REQUEST)
+        att.clock_out = timezone.now()
+        att.save()
+        return Response(self.get_serializer(att).data)
 
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def lunch_in(request):
-    attendance = get_or_create_today_attendance(request.user)
-    attendance.lunch_in = timezone.now()
-    attendance.save()
-    return Response({"message": "Lunch started", "time": attendance.lunch_in})
+# ======================== Muster Requests API ========================
+class MusterRequestViewSet(viewsets.ModelViewSet):
+    queryset = MusterRequest.objects.all()
+    serializer_class = MusterRequestSerializer
+    lookup_field = "id"
 
+    def get_permissions(self):
+        if self.action in ("create", "list", "retrieve"):
+            permission_classes = [IsAuthenticated]
+        elif self.action in ("update", "partial_update", "destroy"):
+            permission_classes = [IsAuthenticated, IsOwnerOrHRAdminManager]
+        else:
+            permission_classes = [IsAuthenticated]
+        return [p() for p in permission_classes]
 
-@api_view(['POST'])
-@permission_classes([IsAuthenticated])
-def lunch_out(request):
-    attendance = get_or_create_today_attendance(request.user)
-    attendance.lunch_out = timezone.now()
-    attendance.save()
-    return Response({"message": "Lunch ended", "time": attendance.lunch_out})
+    def perform_create(self, serializer):
+        serializer.save(employee=self.request.user)
 
+    def get_queryset(self):
+        user = self.request.user
+        if user.role in ("hr", "admin", "manager", "superadmin"):
+            return self.queryset
+        return self.queryset.filter(employee=user)
 
-@api_view(['GET'])
-@permission_classes([IsAuthenticated])
-def attendance_summary_api(request):
-    if request.user.role not in ["admin", "hr", "manager"]:
-        return Response({"error": "Permission denied"}, status=status.HTTP_403_FORBIDDEN)
-
-    today = date.today()
-    data = {
-        "clockin": AttendanceEmployeeSerializer(
-            Attendance.objects.filter(date=today, clock_in__isnull=False), many=True
-        ).data,
-        "clockout": AttendanceEmployeeSerializer(
-            Attendance.objects.filter(date=today, clock_out__isnull=False), many=True
-        ).data,
-        "breakin": AttendanceEmployeeSerializer(
-            Attendance.objects.filter(date=today, break_in__isnull=False), many=True
-        ).data,
-        "breakout": AttendanceEmployeeSerializer(
-            Attendance.objects.filter(date=today, break_out__isnull=False), many=True
-        ).data,
-        "lunchin": AttendanceEmployeeSerializer(
-            Attendance.objects.filter(date=today, lunch_in__isnull=False), many=True
-        ).data,
-        "lunchout": AttendanceEmployeeSerializer(
-            Attendance.objects.filter(date=today, lunch_out__isnull=False), many=True
-        ).data,
-    }
-    return Response(data)
-
-
-# ------------------ Muster Request APIs ------------------
-@api_view(["POST"])
-@permission_classes([IsAuthenticated])
-def create_muster_request(request):
-    serializer = MusterRequestSerializer(data=request.data)
-    if serializer.is_valid():
-        serializer.save(employee=request.user)
-        return Response({"message": "Muster request submitted", "data": serializer.data}, status=status.HTTP_201_CREATED)
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-@api_view(["GET"])
-@permission_classes([IsAuthenticated])
-def list_muster_requests(request):
-    requests = MusterRequest.objects.filter(employee=request.user).order_by("-created_at")
-    serializer = MusterRequestSerializer(requests, many=True)
-    return Response(serializer.data)
-
-
-@api_view(["PUT", "PATCH"])
-@permission_classes([IsAuthenticated])
-def edit_muster_request(request, request_id):
-    try:
-        muster_request = MusterRequest.objects.get(id=request_id, employee=request.user)
-    except MusterRequest.DoesNotExist:
-        return Response({"error": "Request not found"}, status=status.HTTP_404_NOT_FOUND)
-
-    if muster_request.status == "approved":
-        return Response({"error": "Approved requests cannot be edited"}, status=status.HTTP_400_BAD_REQUEST)
-
-    serializer = MusterRequestSerializer(muster_request, data=request.data, partial=True)
-    if serializer.is_valid():
-        serializer.save(status="pending")  # reset to pending
-        return Response({"message": "Muster request updated", "data": serializer.data})
-    return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    def get_serializer_class(self):
+        if self.action in ("partial_update", "update"):
+            if self.request.user.role in ("hr", "admin", "manager", "superadmin"):
+                return MusterRequestUpdateSerializer
+        return super().get_serializer_class()
