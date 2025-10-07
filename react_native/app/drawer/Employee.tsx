@@ -1,8 +1,23 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator, Modal, TextInput, Alert } from "react-native";
+import { 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  ScrollView, 
+  RefreshControl, 
+  ActivityIndicator, 
+  Modal, 
+  TextInput, 
+  Alert,
+  Dimensions 
+} from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { listEmployees, updateEmployee, deleteEmployee } from "../../hooks/api";
+
+const { width } = Dimensions.get('window');
+const isMobile = width < 768;
+const isSmallDevice = width < 375;
 
 interface Employee {
   id: number;
@@ -26,6 +41,18 @@ export default function Employee() {
   const [lastName, setLastName] = useState("");
   const [role, setRole] = useState("");
   const [password, setPassword] = useState("");
+
+  // Responsive styles
+  const containerPadding = isMobile ? 'p-4' : 'p-6';
+  const textSize = {
+    title: isMobile ? 'text-2xl' : 'text-3xl',
+    header: isMobile ? 'text-xl' : 'text-2xl',
+    body: isMobile ? 'text-base' : 'text-lg',
+    small: isMobile ? 'text-sm' : 'text-base'
+  };
+  const buttonPadding = isMobile ? 'py-4' : 'py-3';
+  const modalWidth = isMobile ? 'w-11/12' : 'w-2/3 max-w-md';
+  const inputPadding = isMobile ? 'p-4' : 'p-3';
 
   const fetchEmployees = async () => {
     try {
@@ -130,69 +157,87 @@ export default function Employee() {
     return (
       <View className="flex-1 bg-gray-50 justify-center items-center">
         <ActivityIndicator size="large" color="#007bff" />
-        <Text className="mt-4 text-lg">Loading employees...</Text>
+        <Text className={`mt-4 ${textSize.body}`}>Loading employees...</Text>
       </View>
     );
   }
 
   return (
-    <View className="flex-1 bg-gray-50">
+    <View className={`flex-1 bg-gray-50 ${containerPadding}`}>
       {/* Header */}
-      <View className="flex-row items-center p-4 bg-white shadow-sm">
-        <TouchableOpacity onPress={() => navigation.toggleDrawer?.()} className="mr-4">
-          <Ionicons name="menu-outline" size={28} color="#007bff" />
+      <View className={`flex-row items-center p-4 bg-white shadow-lg rounded-2xl mb-6`}>
+        <TouchableOpacity 
+          onPress={() => navigation.toggleDrawer?.()} 
+          className="mr-4"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="menu-outline" size={isMobile ? 28 : 32} color="#007bff" />
         </TouchableOpacity>
-        <Text className="text-xl font-bold">Employee Management</Text>
+        <Text className={`${textSize.header} font-bold`}>Employee Management</Text>
       </View>
 
       <ScrollView
-        className="flex-1 p-4"
+        className="flex-1"
+        showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <Text className="text-2xl font-bold mb-6 text-center">👥 Employees</Text>
+        <Text className={`${textSize.title} font-bold mb-6 text-center`}>👥 Employees</Text>
 
         {/* Employees List */}
-        <View className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
-          <Text className="text-lg font-semibold p-4 bg-blue-50 border-b">
-            All Employees ({employees.length})
-          </Text>
+        <View className="bg-white rounded-2xl shadow-lg overflow-hidden mb-6">
+          <View className="bg-blue-50 p-4 border-b border-gray-200">
+            <Text className={`${textSize.body} font-semibold text-blue-800`}>
+              All Employees ({employees.length})
+            </Text>
+          </View>
 
           {employees.length > 0 ? (
             employees.map((employee, index) => (
-              <View key={employee.id} className={`border-b ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
+              <View 
+                key={employee.id} 
+                className={`border-b border-gray-100 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+              >
                 <View className="p-4">
-                  <View className="flex-row justify-between items-start mb-2">
-                    <View className="flex-1">
-                      <Text className="text-lg font-semibold">
-                        {employee.first_name} {employee.last_name}
+                  {/* Employee Info */}
+                  <View className="mb-4">
+                    <Text className={`${textSize.body} font-semibold mb-1`}>
+                      {employee.first_name} {employee.last_name}
+                    </Text>
+                    <Text className={`text-gray-600 ${textSize.small} mb-2`}>
+                      ID: {employee.employee_id}
+                    </Text>
+                    <View className="flex-row flex-wrap items-center gap-2">
+                      <Text className={`px-3 py-1.5 rounded-full ${textSize.small} ${getRoleColor(employee.role)}`}>
+                        {employee.role.toUpperCase()}
                       </Text>
-                      <Text className="text-gray-600">ID: {employee.employee_id}</Text>
-                      <View className="flex-row items-center mt-1">
-                        <Text className={`px-2 py-1 rounded text-xs ${getRoleColor(employee.role)}`}>
-                          {employee.role.toUpperCase()}
+                      {employee.is_staff && (
+                        <Text className="px-3 py-1.5 bg-yellow-100 text-yellow-800 rounded-full text-xs">
+                          STAFF
                         </Text>
-                        {employee.is_staff && (
-                          <Text className="ml-2 px-2 py-1 bg-yellow-100 text-yellow-800 rounded text-xs">
-                            STAFF
-                          </Text>
-                        )}
-                      </View>
+                      )}
                     </View>
                   </View>
                   
-                  <View className="flex-row justify-end space-x-2 mt-3">
+                  {/* Action Buttons */}
+                  <View className="flex-row justify-between">
                     <TouchableOpacity
                       onPress={() => openEditModal(employee)}
-                      className="bg-blue-500 px-4 py-2 rounded"
+                      className={`bg-blue-500 px-5 ${buttonPadding} rounded-xl flex-1 mr-2 shadow-sm`}
+                      activeOpacity={0.7}
                     >
-                      <Text className="text-white text-sm">Edit</Text>
+                      <Text className="text-white text-center font-semibold text-base">
+                        Edit
+                      </Text>
                     </TouchableOpacity>
                     
                     <TouchableOpacity
                       onPress={() => handleDeleteEmployee(employee)}
-                      className="bg-red-500 px-4 py-2 rounded"
+                      className={`bg-red-500 px-5 ${buttonPadding} rounded-xl flex-1 ml-2 shadow-sm`}
+                      activeOpacity={0.7}
                     >
-                      <Text className="text-white text-sm">Delete</Text>
+                      <Text className="text-white text-center font-semibold text-base">
+                        Delete
+                      </Text>
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -200,7 +245,8 @@ export default function Employee() {
             ))
           ) : (
             <View className="p-8 items-center">
-              <Text className="text-gray-500 text-lg">No employees found</Text>
+              <Text className={`text-gray-500 ${textSize.body} mb-2`}>No employees found</Text>
+              <Text className="text-gray-400 text-center">Add employees to get started</Text>
             </View>
           )}
         </View>
@@ -213,63 +259,91 @@ export default function Employee() {
         visible={modalVisible}
         onRequestClose={() => setModalVisible(false)}
       >
-        <View className="flex-1 justify-center items-center bg-black/50">
-          <View className="bg-white rounded-lg p-6 w-11/12 max-w-md">
-            <Text className="text-xl font-bold mb-4">Edit Employee</Text>
-
-            {selectedEmployee && (
-              <View className="mb-4 p-3 bg-gray-100 rounded">
-                <Text className="font-semibold">Employee ID: {selectedEmployee.employee_id}</Text>
-              </View>
-            )}
-
-            <TextInput
-              placeholder="First Name"
-              value={firstName}
-              onChangeText={setFirstName}
-              className="border border-gray-300 rounded-lg p-3 mb-3"
-            />
-
-            <TextInput
-              placeholder="Last Name"
-              value={lastName}
-              onChangeText={setLastName}
-              className="border border-gray-300 rounded-lg p-3 mb-3"
-            />
-
-            <TextInput
-              placeholder="Role (employee/hr/manager/admin)"
-              value={role}
-              onChangeText={setRole}
-              className="border border-gray-300 rounded-lg p-3 mb-3"
-            />
-
-            <TextInput
-              placeholder="New Password (leave empty to keep current)"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry
-              className="border border-gray-300 rounded-lg p-3 mb-6"
-            />
-
-            <View className="flex-row justify-between">
-              <TouchableOpacity
+        <View className="flex-1 justify-center items-center bg-black/50 p-4">
+          <View className={`bg-white rounded-2xl p-6 ${modalWidth} max-h-[90%]`}>
+            {/* Modal Header */}
+            <View className="flex-row justify-between items-center mb-6">
+              <Text className={`${textSize.header} font-bold`}>Edit Employee</Text>
+              <TouchableOpacity 
                 onPress={() => {
                   setModalVisible(false);
                   resetForm();
                 }}
-                className="flex-1 bg-gray-500 py-3 rounded-lg mr-2"
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <Text className="text-white text-center">Cancel</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity
-                onPress={handleUpdateEmployee}
-                className="flex-1 bg-blue-600 py-3 rounded-lg ml-2"
-              >
-                <Text className="text-white text-center">Update</Text>
+                <Ionicons name="close" size={28} color="#666" />
               </TouchableOpacity>
             </View>
+
+            {selectedEmployee && (
+              <View className="mb-4 p-4 bg-gray-100 rounded-xl">
+                <Text className={`font-semibold ${textSize.body}`}>
+                  Employee ID: {selectedEmployee.employee_id}
+                </Text>
+              </View>
+            )}
+
+            <ScrollView showsVerticalScrollIndicator={false}>
+              <View className="space-y-4">
+                <TextInput
+                  placeholder="First Name *"
+                  value={firstName}
+                  onChangeText={setFirstName}
+                  className={`border-2 border-gray-200 rounded-xl ${inputPadding} ${textSize.body}`}
+                  placeholderTextColor="#9CA3AF"
+                />
+
+                <TextInput
+                  placeholder="Last Name *"
+                  value={lastName}
+                  onChangeText={setLastName}
+                  className={`border-2 border-gray-200 rounded-xl ${inputPadding} ${textSize.body}`}
+                  placeholderTextColor="#9CA3AF"
+                />
+
+                <TextInput
+                  placeholder="Role (employee/hr/manager/admin) *"
+                  value={role}
+                  onChangeText={setRole}
+                  className={`border-2 border-gray-200 rounded-xl ${inputPadding} ${textSize.body}`}
+                  placeholderTextColor="#9CA3AF"
+                />
+
+                <TextInput
+                  placeholder="New Password (leave empty to keep current)"
+                  value={password}
+                  onChangeText={setPassword}
+                  secureTextEntry
+                  className={`border-2 border-gray-200 rounded-xl ${inputPadding} ${textSize.body}`}
+                  placeholderTextColor="#9CA3AF"
+                />
+
+                <View className="flex-row justify-between space-x-3 pt-2">
+                  <TouchableOpacity
+                    onPress={() => {
+                      setModalVisible(false);
+                      resetForm();
+                    }}
+                    className={`flex-1 bg-gray-500 ${buttonPadding} rounded-xl shadow-sm`}
+                    activeOpacity={0.7}
+                  >
+                    <Text className="text-white text-center font-semibold text-base">
+                      Cancel
+                    </Text>
+                  </TouchableOpacity>
+                  
+                  <TouchableOpacity
+                    onPress={handleUpdateEmployee}
+                    className={`flex-1 bg-blue-600 ${buttonPadding} rounded-xl shadow-sm`}
+                    activeOpacity={0.7}
+                  >
+                    <Text className="text-white text-center font-semibold text-base">
+                      Update
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
           </View>
         </View>
       </Modal>

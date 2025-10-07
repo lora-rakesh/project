@@ -10,6 +10,9 @@ import {
   Pressable,
   Animated,
 } from "react-native";
+import { debugStorage } from "../../hooks/api"
+import { Button } from "react-native";
+
 import { Ionicons, MaterialIcons } from "@expo/vector-icons";
 import * as ImagePicker from "expo-image-picker";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -175,6 +178,9 @@ const handlePress = async (apiFunc: Function, label: string, id: string) => {
           </View>
         </Pressable>
       </Modal>
+<View className="mb-4">
+  <Button title="Check Token" onPress={debugStorage} />
+</View>
 
       {/* Body */}
       <ScrollView contentContainerStyle={{ padding: 16, marginLeft: collapsed ? 100 : 0 }}>
@@ -200,6 +206,7 @@ const handlePress = async (apiFunc: Function, label: string, id: string) => {
                         <Text style={{ color: "white", fontWeight: "600" }}>{btn.label}</Text>
                       </TouchableOpacity>
                     </View>
+                    
                   );
                 })}
               </View>

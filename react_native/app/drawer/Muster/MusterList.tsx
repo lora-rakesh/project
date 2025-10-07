@@ -1,269 +1,219 @@
-import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator, Modal, TextInput } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import { Ionicons } from "@expo/vector-icons";
+import React, { useEffect, useState } from "react";
+import {
+  View,
+  Text,
+  FlatList,
+  ActivityIndicator,
+  TouchableOpacity,
+  Modal,
+  TextInput,
+  Alert,
+} from "react-native";
+import { Picker } from "@react-native-picker/picker"; // dropdown
+import DateTimePicker from "@react-native-community/datetimepicker"; // date picker
 import { listMusterRequests, createMusterRequest, editMusterRequest } from "../../../hooks/api";
 
-interface MusterRequest {
-  id: number;
-  employee_id: string;
-  action: string;
-  requested_time: string;
-  reason: string;
-  status: string;
-  created_at: string;
-  updated_at: string;
-}
-
 export default function MusterList() {
-  const navigation = useNavigation<any>();
-  const [requests, setRequests] = useState<MusterRequest[]>([]);
+  const [musterData, setMusterData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
+
+  // form state
   const [modalVisible, setModalVisible] = useState(false);
-  const [editingRequest, setEditingRequest] = useState<MusterRequest | null>(null);
-  
-  // New request form state
-  const [action, setAction] = useState("");
-  const [requestedTime, setRequestedTime] = useState("");
+  const [editingRequest, setEditingRequest] = useState<any>(null);
+  const [requestType, setRequestType] = useState("Early Leave");
+  const [requestedDate, setRequestedDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [reason, setReason] = useState("");
 
-  const fetchMusterRequests = async () => {
-    try {
-      const data = await listMusterRequests();
-      setRequests(data);
-    } catch (error: any) {
-      console.log("Error fetching muster requests:", error);
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
+  const actions = ["Early Leave", "Late Login", "Network Issue", "Other"];
 
   useEffect(() => {
-    fetchMusterRequests();
+    fetchMuster();
   }, []);
 
-  const onRefresh = () => {
-    setRefreshing(true);
-    fetchMusterRequests();
-  };
-
-  const handleCreateRequest = async () => {
-    if (!action || !requestedTime || !reason) {
-      alert("Please fill all fields");
-      return;
-    }
-
+  const fetchMuster = async () => {
+    setLoading(true);
     try {
-      await createMusterRequest({
-        action,
-        requested_time: requestedTime,
-        reason,
-      });
-      setModalVisible(false);
-      resetForm();
-      fetchMusterRequests();
-      alert("Muster request submitted successfully!");
-    } catch (error: any) {
-      alert("Error creating request: " + (error.response?.data?.message || error.message));
-    }
-  };
-
-  const handleEditRequest = async () => {
-    if (!editingRequest || !action || !requestedTime || !reason) return;
-
-    try {
-      await editMusterRequest(editingRequest.id, {
-        action,
-        requested_time: requestedTime,
-        reason,
-      });
-      setModalVisible(false);
-      resetForm();
-      fetchMusterRequests();
-      alert("Muster request updated successfully!");
-    } catch (error: any) {
-      alert("Error updating request: " + (error.response?.data?.message || error.message));
+      const data = await listMusterRequests();
+      setMusterData(data);
+    } catch (error) {
+      console.log("❌ Error fetching muster requests:", error);
+    } finally {
+      setLoading(false);
     }
   };
 
   const resetForm = () => {
-    setAction("");
-    setRequestedTime("");
-    setReason("");
     setEditingRequest(null);
+    setRequestType("Early Leave");
+    setRequestedDate(new Date());
+    setReason("");
   };
 
-  const openEditModal = (request: MusterRequest) => {
+  const handleSubmit = async () => {
+    if (!requestType || !reason) {
+      Alert.alert("⚠️ Fill all fields");
+      return;
+    }
+
+    const formattedDate = requestedDate.toISOString().split("T")[0]; // YYYY-MM-DD
+
+    try {
+      if (editingRequest) {
+        await editMusterRequest(editingRequest.id, {
+          action: requestType,
+          requested_time: formattedDate,
+          reason,
+        });
+        Alert.alert("✅ Updated", "Muster request updated!");
+      } else {
+        await createMusterRequest({
+          action: requestType,
+          requested_time: formattedDate,
+          reason,
+        });
+        Alert.alert("✅ Created", "Muster request submitted!");
+      }
+      setModalVisible(false);
+      resetForm();
+      fetchMuster();
+    } catch (error) {
+      console.log(error);
+      Alert.alert("❌ Error", "Something went wrong");
+    }
+  };
+
+  const openEdit = (request: any) => {
     setEditingRequest(request);
-    setAction(request.action);
-    setRequestedTime(request.requested_time);
+    setRequestType(request.action);
+    setRequestedDate(new Date(request.requested_time));
     setReason(request.reason);
     setModalVisible(true);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "approved": return "bg-green-100 text-green-800";
-      case "rejected": return "bg-red-100 text-red-800";
-      case "pending": return "bg-yellow-100 text-yellow-800";
-      default: return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const formatDate = (dateString: string) => {
-    try {
-      const date = new Date(dateString);
-      return date.toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: 'short',
-        day: 'numeric'
-      });
-    } catch (error) {
-      return dateString;
-    }
-  };
-
   if (loading) {
     return (
-      <View className="flex-1 bg-gray-50 justify-center items-center">
-        <ActivityIndicator size="large" color="#007bff" />
-        <Text className="mt-4 text-lg">Loading muster requests...</Text>
+      <View className="flex-1 items-center justify-center bg-gray-100">
+        <ActivityIndicator size="large" color="#3b82f6" />
+        <Text className="mt-3 text-gray-600">Loading muster requests...</Text>
       </View>
     );
   }
 
   return (
-    <View className="flex-1 bg-gray-50">
-      {/* Header */}
-      <View className="flex-row items-center p-4 bg-white shadow-sm">
-        <TouchableOpacity onPress={() => navigation.toggleDrawer?.()} className="mr-4">
-          <Ionicons name="menu-outline" size={28} color="#007bff" />
-        </TouchableOpacity>
-        <Text className="text-xl font-bold">Muster Requests</Text>
-      </View>
+    <View className="flex-1 bg-gray-100 p-4">
+      <Text className="text-2xl font-bold mb-4 text-gray-800">📋 Muster Requests</Text>
 
-      <ScrollView
-        className="flex-1 p-4"
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+      {/* New Request Button */}
+      <TouchableOpacity
+        className="bg-blue-600 p-4 rounded-lg mb-4"
+        onPress={() => {
+          resetForm();
+          setModalVisible(true);
+        }}
       >
-        <Text className="text-2xl font-bold mb-6 text-center">📋 My Muster Requests</Text>
+        <Text className="text-white font-bold text-center text-lg">+ New Request</Text>
+      </TouchableOpacity>
 
-        {/* Create New Request Button */}
-        <TouchableOpacity
-          className="bg-blue-600 py-3 rounded-lg mb-6"
-          onPress={() => {
-            resetForm();
-            setModalVisible(true);
-          }}
-        >
-          <Text className="text-white text-lg font-semibold text-center">+ New Muster Request</Text>
-        </TouchableOpacity>
+      {/* List */}
+      {musterData.length === 0 ? (
+        <Text className="text-gray-600">No muster requests found.</Text>
+      ) : (
+        <FlatList
+          data={musterData}
+          keyExtractor={(item) => item.id.toString()}
+          renderItem={({ item }) => (
+            <View className="bg-white p-4 mb-3 rounded-xl shadow-md">
+              <Text className="text-lg font-semibold text-gray-800">{item.action}</Text>
+              <Text className="text-gray-600">🗓️ {item.requested_time}</Text>
+              <Text className="text-gray-600">📌 {item.reason}</Text>
+              <Text
+                className={`mt-2 font-bold ${
+                  item.status === "approved"
+                    ? "text-green-600"
+                    : item.status === "pending"
+                    ? "text-yellow-600"
+                    : "text-red-600"
+                }`}
+              >
+                {item.status.toUpperCase()}
+              </Text>
 
-        {/* Requests List */}
-        <View className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
-          <Text className="text-lg font-semibold p-4 bg-blue-50 border-b">
-            My Requests ({requests.length})
-          </Text>
-
-          {requests.length > 0 ? (
-            requests.map((request, index) => (
-              <View key={request.id} className={`border-b ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                <View className="p-4">
-                  <View className="flex-row justify-between items-start mb-2">
-                    <View className="flex-1">
-                      <Text className="text-lg font-semibold">{request.action}</Text>
-                      <Text className="text-gray-600">Requested: {formatDate(request.requested_time)}</Text>
-                      <Text className="text-gray-600 mt-1">Reason: {request.reason}</Text>
-                    </View>
-                    <Text className={`px-3 py-1 rounded-full text-xs ${getStatusColor(request.status)}`}>
-                      {request.status.toUpperCase()}
-                    </Text>
-                  </View>
-                  
-                  <View className="flex-row justify-between items-center mt-3">
-                    <Text className="text-xs text-gray-500">
-                      Created: {formatDate(request.created_at)}
-                    </Text>
-                    {request.status === "pending" && (
-                      <TouchableOpacity
-                        onPress={() => openEditModal(request)}
-                        className="bg-yellow-500 px-3 py-1 rounded"
-                      >
-                        <Text className="text-white text-xs">Edit</Text>
-                      </TouchableOpacity>
-                    )}
-                  </View>
-                </View>
-              </View>
-            ))
-          ) : (
-            <View className="p-8 items-center">
-              <Text className="text-gray-500 text-lg mb-4">No muster requests found</Text>
-              <Text className="text-gray-400 text-center">Create your first muster request to get started</Text>
+              {item.status === "pending" && (
+                <TouchableOpacity
+                  className="bg-yellow-500 p-2 mt-3 rounded-lg"
+                  onPress={() => openEdit(item)}
+                >
+                  <Text className="text-white text-center font-semibold">✏️ Edit</Text>
+                </TouchableOpacity>
+              )}
             </View>
           )}
-        </View>
+        />
+      )}
 
-        {/* Navigation to Attendance */}
-        <TouchableOpacity
-          className="px-6 py-3 bg-gray-600 rounded-lg mb-8"
-          onPress={() => navigation.navigate("MusterUpdate")}
-        >
-          <Text className="text-white text-lg font-semibold text-center">View Attendance Dashboard</Text>
-        </TouchableOpacity>
-      </ScrollView>
-
-      {/* Create/Edit Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={modalVisible}
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View className="flex-1 justify-center items-center bg-black/50">
-          <View className="bg-white rounded-lg p-6 w-11/12 max-w-md">
-            <Text className="text-xl font-bold mb-4">
-              {editingRequest ? "Edit Muster Request" : "New Muster Request"}
+      {/* Modal */}
+      <Modal visible={modalVisible} transparent animationType="slide">
+        <View className="flex-1 bg-black/50 justify-center items-center px-4">
+          <View className="bg-white w-full rounded-2xl p-6">
+            <Text className="text-xl font-bold mb-4 text-gray-800">
+              {editingRequest ? "✏️ Edit Request" : "🆕 New Request"}
             </Text>
 
-            <TextInput
-              placeholder="Action (e.g., Early Leave, Late Arrival)"
-              value={action}
-              onChangeText={setAction}
-              className="border border-gray-300 rounded-lg p-3 mb-3"
-            />
+            {/* Action Picker */}
+            <Picker
+              selectedValue={requestType}
+              onValueChange={(val) => setRequestType(val)}
+              className="bg-white border rounded-lg mb-3"
+            >
+              {actions.map((act) => (
+                <Picker.Item key={act} label={act} value={act} />
+              ))}
+            </Picker>
 
-            <TextInput
-              placeholder="Requested Time (YYYY-MM-DD)"
-              value={requestedTime}
-              onChangeText={setRequestedTime}
-              className="border border-gray-300 rounded-lg p-3 mb-3"
-            />
+            {/* Date Picker */}
+            <TouchableOpacity
+              className="border p-3 rounded-lg mb-3"
+              onPress={() => setShowDatePicker(true)}
+            >
+              <Text>{requestedDate.toDateString()}</Text>
+            </TouchableOpacity>
+            {showDatePicker && (
+              <DateTimePicker
+                value={requestedDate}
+                mode="date"
+                display="default"
+                onChange={(event, date) => {
+                  setShowDatePicker(false);
+                  if (date) setRequestedDate(date);
+                }}
+              />
+            )}
 
+            {/* Reason */}
             <TextInput
+              className="border p-3 rounded-lg mb-4"
               placeholder="Reason"
               value={reason}
               onChangeText={setReason}
-              multiline
-              numberOfLines={3}
-              className="border border-gray-300 rounded-lg p-3 mb-6"
             />
 
             <View className="flex-row justify-between">
               <TouchableOpacity
-                onPress={() => setModalVisible(false)}
-                className="flex-1 bg-gray-500 py-3 rounded-lg mr-2"
+                className="flex-1 bg-gray-400 p-3 rounded-lg mr-2"
+                onPress={() => {
+                  setModalVisible(false);
+                  resetForm();
+                }}
               >
-                <Text className="text-white text-center">Cancel</Text>
+                <Text className="text-white text-center font-bold">Cancel</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
-                onPress={editingRequest ? handleEditRequest : handleCreateRequest}
-                className="flex-1 bg-blue-600 py-3 rounded-lg ml-2"
+                className="flex-1 bg-blue-600 p-3 rounded-lg"
+                onPress={handleSubmit}
               >
-                <Text className="text-white text-center">
+                <Text className="text-white text-center font-bold">
                   {editingRequest ? "Update" : "Submit"}
                 </Text>
               </TouchableOpacity>

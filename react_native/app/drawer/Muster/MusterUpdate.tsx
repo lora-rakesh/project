@@ -1,8 +1,20 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, TouchableOpacity, ScrollView, RefreshControl, ActivityIndicator } from "react-native";
+import { 
+  View, 
+  Text, 
+  TouchableOpacity, 
+  ScrollView, 
+  RefreshControl, 
+  ActivityIndicator,
+  Dimensions 
+} from "react-native";
 import { useNavigation } from "@react-navigation/native";
 import { Ionicons } from "@expo/vector-icons";
 import { getAttendanceSummary } from "../../../hooks/api";
+
+const { width } = Dimensions.get('window');
+const isMobile = width < 768;
+const isSmallDevice = width < 375;
 
 interface EmployeeAttendance {
   employee_id: string;
@@ -30,6 +42,16 @@ export default function MusterUpdate() {
   const [attendanceData, setAttendanceData] = useState<AttendanceSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+
+  // Responsive styles
+  const containerPadding = isMobile ? 'p-4' : 'p-6';
+  const textSize = {
+    title: isMobile ? 'text-2xl' : 'text-3xl',
+    header: isMobile ? 'text-xl' : 'text-2xl',
+    body: isMobile ? 'text-base' : 'text-lg',
+    small: isMobile ? 'text-sm' : 'text-base',
+    xsmall: isMobile ? 'text-xs' : 'text-sm'
+  };
 
   const toggleMusterDrawer = () => {
     navigation.toggleDrawer?.();
@@ -105,7 +127,7 @@ export default function MusterUpdate() {
     return (
       <View className="flex-1 bg-gray-50 justify-center items-center">
         <ActivityIndicator size="large" color="#007bff" />
-        <Text className="mt-4 text-lg">Loading attendance...</Text>
+        <Text className={`mt-4 ${textSize.body}`}>Loading attendance...</Text>
       </View>
     );
   }
@@ -113,89 +135,98 @@ export default function MusterUpdate() {
   const employees = getAllEmployees();
 
   return (
-    <View className="flex-1 bg-gray-50">
-      <View className="flex-row items-center p-4 bg-white shadow-sm">
-        <TouchableOpacity onPress={toggleMusterDrawer} className="mr-4">
-          <Ionicons name="menu-outline" size={28} color="#007bff" />
+    <View className={`flex-1 bg-gray-50 ${containerPadding}`}>
+      {/* Header */}
+      <View className={`flex-row items-center p-4 bg-white shadow-lg rounded-2xl mb-6`}>
+        <TouchableOpacity 
+          onPress={toggleMusterDrawer} 
+          className="mr-4"
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <Ionicons name="menu-outline" size={isMobile ? 28 : 32} color="#007bff" />
         </TouchableOpacity>
-        <Text className="text-xl font-bold">Attendance Dashboard</Text>
+        <Text className={`${textSize.header} font-bold`}>Attendance Dashboard</Text>
       </View>
 
       <ScrollView
-        className="flex-1 p-4"
+        className="flex-1"
+        showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        <Text className="text-2xl font-bold mb-6 text-center">📊 Live Attendance</Text>
+        <Text className={`${textSize.title} font-bold mb-6 text-center`}>📊 Live Attendance</Text>
 
         {attendanceData && (
-          <View className="bg-white rounded-lg p-4 shadow-md mb-6">
-            <Text className="text-lg font-semibold mb-3">Today's Summary</Text>
+          <View className="bg-white rounded-2xl p-5 shadow-lg mb-6">
+            <Text className={`${textSize.body} font-semibold mb-4`}>Today's Summary</Text>
             <View className="flex-row flex-wrap justify-between">
-              <View className="items-center mb-3 w-1/2">
-                <Text className="text-sm text-gray-500">Clocked In</Text>
+              <View className="items-center mb-4 w-1/2">
+                <Text className={`text-gray-500 ${textSize.small} mb-1`}>Clocked In</Text>
                 <Text className="text-2xl font-bold text-green-600">{attendanceData.clockin.length}</Text>
               </View>
-              <View className="items-center mb-3 w-1/2">
-                <Text className="text-sm text-gray-500">Clocked Out</Text>
+              <View className="items-center mb-4 w-1/2">
+                <Text className={`text-gray-500 ${textSize.small} mb-1`}>Clocked Out</Text>
                 <Text className="text-2xl font-bold text-blue-600">{attendanceData.clockout.length}</Text>
               </View>
-              <View className="items-center mb-3 w-1/2">
-                <Text className="text-sm text-gray-500">On Lunch</Text>
+              <View className="items-center mb-4 w-1/2">
+                <Text className={`text-gray-500 ${textSize.small} mb-1`}>On Lunch</Text>
                 <Text className="text-2xl font-bold text-yellow-600">{attendanceData.lunchin.length}</Text>
               </View>
-              <View className="items-center mb-3 w-1/2">
-                <Text className="text-sm text-gray-500">On Break</Text>
+              <View className="items-center mb-4 w-1/2">
+                <Text className={`text-gray-500 ${textSize.small} mb-1`}>On Break</Text>
                 <Text className="text-2xl font-bold text-purple-600">{attendanceData.breakin.length}</Text>
               </View>
             </View>
           </View>
         )}
 
-        <View className="bg-white rounded-lg shadow-md overflow-hidden mb-6">
-          <Text className="text-lg font-semibold p-4 bg-blue-50 border-b">
-            Employees ({employees.length})
-          </Text>
+        <View className="bg-white rounded-2xl shadow-lg overflow-hidden mb-6">
+          <View className="bg-blue-50 p-4 border-b border-gray-200">
+            <Text className={`${textSize.body} font-semibold text-blue-800`}>
+              Employees ({employees.length})
+            </Text>
+          </View>
           
-          <View className="flex-row bg-gray-100 border-b">
-            <Text className="flex-2 p-3 font-semibold text-xs">Employee</Text>
-            <Text className="flex-1 p-3 font-semibold text-xs">Clock In</Text>
-            <Text className="flex-1 p-3 font-semibold text-xs">Clock Out</Text>
-            <Text className="flex-1 p-3 font-semibold text-xs">Status</Text>
+          {/* Table Header */}
+          <View className="flex-row bg-gray-100 border-b border-gray-200">
+            <Text className={`flex-2 p-3 font-semibold ${textSize.xsmall}`}>Employee</Text>
+            <Text className={`flex-1 p-3 font-semibold ${textSize.xsmall}`}>Clock In</Text>
+            <Text className={`flex-1 p-3 font-semibold ${textSize.xsmall}`}>Clock Out</Text>
+            <Text className={`flex-1 p-3 font-semibold ${textSize.xsmall}`}>Status</Text>
           </View>
 
           {employees.length > 0 ? (
             employees.map((employee, index) => (
-              <View key={employee.employee_id} className={`flex-row border-b ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}>
-                <View className="flex-2 p-2">
-                  <Text className="text-xs font-semibold">{employee.first_name} {employee.last_name}</Text>
-                  <Text className="text-xs text-gray-500">{employee.employee_id}</Text>
+              <View 
+                key={employee.employee_id} 
+                className={`flex-row border-b border-gray-100 ${index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}`}
+              >
+                <View className="flex-2 p-3">
+                  <Text className={`font-semibold ${textSize.xsmall}`}>
+                    {employee.first_name} {employee.last_name}
+                  </Text>
+                  <Text className={`text-gray-500 ${textSize.xsmall} mt-1`}>
+                    {employee.employee_id}
+                  </Text>
                 </View>
-                <Text className={`flex-1 p-2 text-xs ${employee.clock_in ? 'text-green-600' : 'text-red-500'}`}>
+                <Text className={`flex-1 p-3 ${textSize.xsmall} ${employee.clock_in ? 'text-green-600 font-medium' : 'text-red-500'}`}>
                   {formatTime(employee.clock_in)}
                 </Text>
-                <Text className={`flex-1 p-2 text-xs ${employee.clock_out ? 'text-green-600' : 'text-red-500'}`}>
+                <Text className={`flex-1 p-3 ${textSize.xsmall} ${employee.clock_out ? 'text-green-600 font-medium' : 'text-red-500'}`}>
                   {formatTime(employee.clock_out)}
                 </Text>
-                <View className="flex-1 p-2">
-                  <Text className={`text-xs px-2 py-1 rounded-full text-center ${getStatusColor(getEmployeeStatus(employee))}`}>
+                <View className="flex-1 p-3">
+                  <Text className={`${textSize.xsmall} px-2 py-1.5 rounded-full text-center ${getStatusColor(getEmployeeStatus(employee))}`}>
                     {getEmployeeStatus(employee)}
                   </Text>
                 </View>
               </View>
             ))
           ) : (
-            <View className="p-4 items-center">
-              <Text className="text-gray-500">No attendance data available</Text>
+            <View className="p-6 items-center">
+              <Text className={`text-gray-500 ${textSize.body}`}>No attendance data available</Text>
             </View>
           )}
         </View>
-
-        <TouchableOpacity
-          className="px-6 py-3 bg-gray-600 rounded-lg mb-8"
-          onPress={() => navigation.navigate("MusterList")}
-        >
-          <Text className="text-white text-lg font-semibold text-center">Back to Muster List</Text>
-        </TouchableOpacity>
       </ScrollView>
     </View>
   );
